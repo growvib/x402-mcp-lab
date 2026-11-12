@@ -1,0 +1,16 @@
+name: Feature request
+description: Suggest a check, a view or an improvement.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you want to do
+      description: The question you are trying to answer about an x402 endpoint, and where the lab falls short.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What the lab should do instead. For a new check, cite the part of the spec it enforces.

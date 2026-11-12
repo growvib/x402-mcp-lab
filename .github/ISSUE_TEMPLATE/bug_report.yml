@@ -1,0 +1,44 @@
+name: Bug report
+description: A check is wrong, the page misreads a quote, or something crashes.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a security issue, use the private reporting form in SECURITY.md, never a public issue.
+        Before pasting a run or a report, use the lab's own export: it strips tokens and signed
+        payloads. Remove anything else you do not want public, such as your wallet address.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. npm start, source: demo server
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: endpoint
+    attributes:
+      label: Endpoint
+      description: The x402 resource or MCP endpoint, if the problem is specific to one.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Node version, browser and wallet extension.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Report or errors
+      description: The redacted export from History, `npm run check -- <url> --markdown` output, or console errors.
+      render: markdown

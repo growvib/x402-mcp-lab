@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev-tools:
+        patterns: ["*"]
+    ignore:
+      # The type definitions track the oldest Node this runs on (engines and .node-version), not
+      # the newest release: types for a later Node describe APIs the minimum does not have.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

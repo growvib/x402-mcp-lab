@@ -1,0 +1,1532 @@
+/* x402 lab.
+ *
+ * Three rules this file follows, because the first version broke all three:
+ *
+ *   1. One border per surface. Nesting a bordered row inside a bordered card inside a bordered
+ *      column reads as noise and hides the one box that matters. Depth comes from background.
+ *   2. Monospace is for values a person might copy: amounts, addresses, hashes, code. Labels and
+ *      explanations are prose and set in the text face.
+ *   3. Helper text is read, so it is 13px, not 11px.
+ *
+ * No webfont is fetched. This is a local tool that can move money: a stylesheet from a CDN means it
+ * does not work offline and that a third party learns when you are using it.
+ */
+
+:root {
+  /* One palette, not three.
+   *
+   * Every token is declared once, as light-dark(light, dark), and the browser resolves it from the
+   * used color scheme. The earlier version carried the dark values twice (once under a
+   * prefers-color-scheme query, once under [data-theme="dark"]), which is two places for a colour
+   * to drift out of step with the third. Switching themes now changes one property.
+   *
+   * Contrast is not a matter of taste here: test/unit/contrast.test.mjs computes every text on
+   * surface pair in both schemes and fails under WCAG AA. */
+  color-scheme: light dark;
+
+  --bg: light-dark(#f6f7f9, #0e0f12);
+  --surface: light-dark(#ffffff, #16181d);
+  --surface-2: light-dark(#f1f3f6, #1c1f25);
+  --surface-3: light-dark(#e9ecf1, #23262e);
+  /* --line divides, --line-strong bounds a control. The second one carries an accessibility
+   * requirement the first does not (WCAG 1.4.11: the boundary that tells you where an input is
+   * must reach 3:1), which is why they are two tokens and not one with an opacity. */
+  --line: light-dark(#e3e6ec, #262a32);
+  --line-strong: light-dark(#868d9a, #6e7684);
+
+  --ink: light-dark(#14171c, #e8eaed);
+  --muted: light-dark(#555c6b, #a8aeb9);
+  --faint: light-dark(#6b7280, #8c929d);
+
+  --accent: light-dark(#5b4bd6, #a99cff);
+  --accent-ink: light-dark(#ffffff, #14121f);
+  --accent-soft: light-dark(#ece9fb, #221f3a);
+  /* The primary button under the pointer and under a press. Each step moves away from the page
+   * (darker in light, lighter in dark), so the label only ever gains contrast. */
+  --accent-hover: light-dark(#4c3dc4, #bab0ff);
+  --accent-press: light-dark(#4031ad, #c9c1ff);
+
+  --ok: light-dark(#12703a, #5fdc93);
+  --ok-bg: light-dark(#e6f5ec, #12251a);
+  --ok-line: light-dark(#bfe3cd, #1f4530);
+
+  --warn: light-dark(#7a4f00, #fbbf24);
+  --warn-bg: light-dark(#fdf3e0, #2a2110);
+  --warn-line: light-dark(#ecd9b0, #4a3a15);
+
+  --bad: light-dark(#b3261e, #ff9b93);
+  --bad-bg: light-dark(#fdecea, #2b1518);
+  --bad-line: light-dark(#f2c6c2, #55262a);
+
+  --shadow:
+    light-dark(0 1px 2px rgba(16, 20, 28, 0.05), 0 1px 2px rgba(0, 0, 0, 0.4)),
+    light-dark(0 8px 24px -16px rgba(16, 20, 28, 0.25), 0 10px 30px -20px rgba(0, 0, 0, 0.9));
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --radius: 12px;
+
+  /* Motion. One duration and one curve, so nothing in the page moves to its own rhythm.
+   * Both collapse to zero under prefers-reduced-motion, at the bottom of this file. */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --fast: 120ms;
+  --slow: 220ms;
+}
+
+/* The toggle picks a scheme rather than redeclaring the palette. */
+:root[data-theme="light"] {
+  color-scheme: only light;
+}
+:root[data-theme="dark"] {
+  color-scheme: only dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px / 1.6 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+.mono {
+  font-family: var(--mono);
+}
+.muted {
+  color: var(--muted);
+}
+.faint {
+  color: var(--faint);
+}
+.grow {
+  flex: 1;
+}
+[hidden] {
+  /* biome-ignore lint/complexity/noImportantStyles: the hidden attribute must win over any display a component sets */
+  display: none !important;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* shell ------------------------------------------------------------------- */
+
+.app {
+  display: grid;
+  grid-template-rows: 56px 1fr;
+  height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.brand-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: 208px 1fr;
+  min-height: 0;
+}
+.rail {
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+  padding: 18px 12px;
+  display: flex;
+  flex-direction: column;
+}
+.rail-cap {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: 0 10px 10px;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 10px;
+  margin-bottom: 2px;
+  border-radius: 9px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  text-decoration: none;
+}
+.nav:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.nav.on {
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 500;
+}
+.nav.on svg {
+  color: var(--accent);
+}
+
+.view {
+  min-width: 0;
+  overflow-y: auto;
+}
+.page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 32px 24px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.page.wide {
+  max-width: 1040px;
+}
+
+/* type -------------------------------------------------------------------- */
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 600;
+}
+h1 {
+  font-size: 27px;
+  line-height: 1.2;
+  margin: 6px 0 6px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+h2 {
+  font-size: 17px;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+h3 {
+  font-size: 14px;
+  margin: 0;
+  font-weight: 600;
+}
+.lede {
+  color: var(--muted);
+  font-size: 15px;
+  margin: 0;
+}
+.help {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+.label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.value {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+.detail {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* controls ---------------------------------------------------------------- */
+
+input,
+select,
+textarea {
+  font: inherit;
+  font-size: 14px;
+  width: 100%;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 9px 11px;
+}
+input.mono,
+textarea {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+/* The native select is kept and dressed rather than rebuilt. A hand-rolled listbox is where the
+ * keyboard handling, the type-ahead and the mobile behaviour quietly go wrong; the only things
+ * missing from the real one are the arrow and the room for it. */
+select {
+  appearance: none;
+  padding-right: 34px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 17px) center,
+    calc(100% - 12px) center;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+input::placeholder {
+  color: var(--faint);
+}
+
+/* Buttons: one base, four variants (default, primary, quiet, danger), two sizes (sm, lg).
+ *
+ * A variant sets custom properties and nothing else; the base is the only rule that paints, and it
+ * paints every state from them. The base states sit inside :where() so they carry the specificity
+ * of a bare `button`. They used to be `button:hover:not(:disabled)`, which outranked
+ * `button.primary`: hovering the primary button swapped its fill for --surface-2 and left its dark
+ * label on a dark background. A component that restyles a button (.pick, .chip, .check-strip)
+ * now wins with a single class, as it reads like it should. */
+button {
+  --btn-bg: var(--surface);
+  --btn-line: var(--line-strong);
+  --btn-ink: var(--ink);
+  --btn-bg-hover: var(--surface-2);
+  --btn-line-hover: var(--line-strong);
+  --btn-ink-hover: var(--ink);
+  --btn-bg-press: var(--surface-3);
+
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  height: 38px;
+  padding: 0 15px;
+  border-radius: 9px;
+  border: 1px solid var(--btn-line);
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+button:where(:hover:not(:disabled)) {
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-line-hover);
+  color: var(--btn-ink-hover);
+}
+button:where(:active:not(:disabled)) {
+  background: var(--btn-bg-press);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  --btn-bg: var(--accent);
+  --btn-line: var(--accent);
+  --btn-ink: var(--accent-ink);
+  --btn-bg-hover: var(--accent-hover);
+  --btn-line-hover: var(--accent-hover);
+  --btn-ink-hover: var(--accent-ink);
+  --btn-bg-press: var(--accent-press);
+}
+button.quiet {
+  --btn-bg: transparent;
+  --btn-line: transparent;
+  --btn-ink: var(--muted);
+  --btn-line-hover: transparent;
+}
+button.danger {
+  --btn-line: var(--bad-line);
+  --btn-ink: var(--bad);
+  --btn-bg-hover: var(--bad-bg);
+  --btn-line-hover: var(--bad);
+  --btn-ink-hover: var(--bad);
+  --btn-bg-press: var(--bad-bg);
+}
+button.sm {
+  height: 30px;
+  font-size: 13px;
+  padding: 0 10px;
+}
+button.lg {
+  height: 46px;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0 20px;
+}
+
+.segmented {
+  display: inline-flex;
+  background: var(--surface-2);
+  border-radius: 9px;
+  padding: 3px;
+  gap: 2px;
+}
+.segmented button {
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+}
+.segmented button:hover:not(.on) {
+  color: var(--ink);
+}
+.segmented button.on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.tabs {
+  display: flex;
+  gap: 22px;
+  border-bottom: 1px solid var(--line);
+}
+.tab {
+  padding: 0 0 11px;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab:hover {
+  color: var(--ink);
+  border-bottom-color: var(--line-strong);
+}
+.tab.on {
+  color: var(--ink);
+  font-weight: 500;
+  border-bottom-color: var(--accent);
+}
+
+/* surfaces ---------------------------------------------------------------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.card > .card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.card > .card-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.card > .card-foot {
+  padding: 14px 18px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--surface-2);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+.inset {
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.pill.ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.pill.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.pill.bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.pill.accent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.pill.mono {
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+/* The ring a button wears while it is working. Sized to the text beside it and given its own
+   colour from currentColor, so it reads on the primary button and the quiet one alike. Under
+   reduced motion it stops spinning and stays a ring: the changed label is what carries the state
+   there, and a spinner that does not spin is still a mark that something is in progress. */
+.spinner {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: spin 0.7s linear infinite;
+  opacity: 0.85;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+/* The network in the top bar: a mark, a name, and a caret only when there is a choice. */
+.netmark {
+  flex: none;
+  display: block;
+  border-radius: 3px;
+}
+.netchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+#networkButton {
+  gap: 7px;
+}
+#networkButton .caret {
+  opacity: 0.5;
+}
+#networkButton:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.pick-icon.drawn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+}
+.pick.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* A pill that does something. The balance in the top bar is one of these: it reads as a value and
+   presses as a button, because in two of its three states there is a thing to ask the wallet. */
+.pill-button {
+  font-weight: 500;
+  --btn-ink: var(--muted);
+}
+.pill-button.ok {
+  --btn-bg: var(--ok-bg);
+  --btn-line: var(--ok-line);
+  --btn-ink: var(--ok);
+  --btn-bg-hover: var(--ok-bg);
+  --btn-line-hover: var(--ok);
+  --btn-ink-hover: var(--ok);
+  --btn-bg-press: var(--ok-bg);
+}
+
+/* The second route to the same order, inside the quote card rather than in a card of its own. It
+   reads as a distinct block without becoming a second place to look: a rule above it, the same
+   rhythm as the rest of the body, and a tint only when it is the route that is open. */
+.balance-route {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.balance-route.lead {
+  margin: 18px -16px -4px;
+  padding: 16px;
+  border-top: 1px solid var(--ok-line);
+  border-radius: 10px;
+  background: var(--ok-bg);
+}
+.balance-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.balance-head b {
+  font-size: 14px;
+}
+
+.callout {
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 13.5px;
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+}
+.callout.ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.callout.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.callout.bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.callout.info {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.callout b {
+  color: inherit;
+}
+.callout .callout-body {
+  flex: 1;
+}
+
+/* steps ------------------------------------------------------------------- */
+
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.step-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  color: var(--faint);
+}
+.step.done {
+  color: var(--muted);
+}
+.step.done .step-dot {
+  background: var(--ok-bg);
+  border-color: var(--ok-line);
+  color: var(--ok);
+}
+.step.on {
+  color: var(--ink);
+  font-weight: 600;
+}
+.step.on .step-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.step-line {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+  margin: 0 12px;
+  min-width: 16px;
+}
+
+/* a step that is finished collapses to one line you can reopen */
+.summary-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 14px;
+}
+.summary-row .summary-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* the payment figure, which is the one thing nobody should have to hunt for */
+.amount {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+.amount b {
+  font-family: var(--mono);
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.amount span {
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 18px 24px;
+}
+/* Four facts read as a block of four, not as three and a straggler. */
+.metrics.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 640px) {
+  .metrics.two {
+    grid-template-columns: 1fr;
+  }
+}
+.metric .label {
+  margin-bottom: 3px;
+}
+
+.check-strip {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+}
+.check-strip.ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.check-strip.bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.check-strip.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.check-strip button {
+  height: 26px;
+  font-size: 13px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.check-list {
+  display: flex;
+  flex-direction: column;
+}
+.check-row {
+  display: grid;
+  grid-template-columns: 20px 150px 1fr;
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+  align-items: start;
+}
+.check-row:first-child {
+  border-top: none;
+}
+.check-row .why {
+  color: var(--muted);
+  font-size: 13px;
+}
+.check-row.failed .why {
+  color: var(--bad);
+}
+.check-mark {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.check-mark.ok {
+  color: var(--ok);
+}
+.check-mark.fail {
+  color: var(--bad);
+}
+.check-mark.unchecked {
+  color: var(--faint);
+}
+
+/* outcome ----------------------------------------------------------------- */
+
+.status-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.status-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.status-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-family: var(--mono);
+}
+.status-icon.ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.status-icon.bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.status-icon.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.status-icon.idle {
+  background: var(--surface-2);
+  color: var(--faint);
+}
+.status-row .status-text {
+  font-size: 14px;
+}
+.status-row .status-note {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* inspector --------------------------------------------------------------- */
+
+.inspector {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.inspector > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 13px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.inspector > summary::-webkit-details-marker {
+  display: none;
+}
+.inspector[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+.event {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+  align-items: baseline;
+}
+.event:first-of-type {
+  border-top: none;
+}
+.event-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+  margin-top: 6px;
+}
+.event-dot.ok {
+  background: var(--ok);
+}
+.event-dot.info {
+  background: var(--accent);
+}
+.event-dot.bad {
+  background: var(--bad);
+}
+
+pre {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--ink);
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 14px 16px;
+  overflow: auto;
+  max-height: 360px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* lists ------------------------------------------------------------------- */
+
+.option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  height: auto;
+  font-weight: 400;
+}
+.option:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+.option.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.option .option-main {
+  flex: 1;
+  min-width: 0;
+}
+.option .option-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+.option .option-sub {
+  font-size: 13px;
+  color: var(--muted);
+}
+.option .option-price {
+  font-family: var(--mono);
+  font-size: 14px;
+}
+
+/* catalog ----------------------------------------------------------------- */
+
+/* A list of four can be cards. A list of four hundred has to be a list: one line per row, the price
+ * on a column you can scan down, and the filtering above it rather than inside it. */
+.pick-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.pick {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  height: auto;
+  padding: 9px 14px;
+  border: none;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  font-weight: 400;
+  cursor: pointer;
+}
+.pick:first-child {
+  border-top: none;
+}
+.pick:hover {
+  background: var(--surface-2);
+}
+.pick.on {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.pick .pick-title {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.pick .pick-meta {
+  font-size: 12.5px;
+  color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pick .pick-price {
+  font-family: var(--mono);
+  font-size: 13px;
+  flex: none;
+}
+
+/* An order row opens in place: its detail sits under it, inside the same list, on the inset
+   surface, so reading one order does not move the list out from under the pointer. */
+.pick .pill {
+  flex: none;
+}
+.order-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.order-detail .row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.order-detail a {
+  overflow-wrap: anywhere;
+}
+.live-order {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.live-order-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.chip-row .chip-label {
+  font-size: 12.5px;
+  color: var(--faint);
+  flex: none;
+  margin-right: 4px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 400;
+  cursor: pointer;
+}
+.chip:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+.chip.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 500;
+}
+.chip.more {
+  border-style: dashed;
+}
+.chip .chip-count {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.chip.on .chip-count {
+  color: inherit;
+}
+
+.count-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--ink);
+}
+.count-line .muted {
+  color: var(--muted);
+}
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.empty p {
+  margin: 0;
+}
+.empty .row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* the empty playground ---------------------------------------------------- */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.card.teach {
+  background: var(--surface-2);
+}
+.beats {
+  list-style: none;
+  counter-reset: beat;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.beats li {
+  counter-increment: beat;
+  display: grid;
+  grid-template-columns: 26px 92px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.beats li::before {
+  content: counter(beat);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.beats li b {
+  color: var(--ink);
+  font-weight: 500;
+}
+.teach-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.teach-foot .help {
+  flex: 1;
+  min-width: 200px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+th,
+td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+th {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--faint);
+}
+tr:last-child td {
+  border-bottom: none;
+}
+
+/* the picker -------------------------------------------------------------- */
+
+dialog.picker {
+  border: 1px solid var(--line);
+  padding: 0;
+  border-radius: var(--radius);
+  width: min(420px, calc(100vw - 32px));
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+dialog.picker::backdrop {
+  background: rgba(8, 9, 12, 0.5);
+}
+.picker-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+}
+.picker-inner h2 {
+  font-size: 16px;
+  margin: 0;
+}
+.picker-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* A row tall enough for an icon and two lines, used where the choice is a thing rather than a
+   line item: the same .pick row, one size up. */
+.pick.tall {
+  padding: 12px 14px;
+  align-items: center;
+  gap: 12px;
+}
+.pick .pick-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.pick .pick-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  flex: none;
+  object-fit: contain;
+  background: var(--surface-2);
+}
+.pick .pick-icon.placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.pick:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* drawer ------------------------------------------------------------------ */
+
+dialog.drawer {
+  border: none;
+  padding: 0;
+  margin: 0 0 0 auto;
+  height: 100vh;
+  max-height: 100vh;
+  width: min(520px, 100vw);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+dialog.drawer::backdrop {
+  background: rgba(8, 9, 12, 0.5);
+}
+.drawer-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.drawer-body {
+  padding: 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+}
+
+.footer-note {
+  color: var(--faint);
+  font-size: 12.5px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 860px) {
+  .body {
+    grid-template-columns: 64px 1fr;
+  }
+  .nav span,
+  .rail-cap {
+    display: none;
+  }
+  .nav {
+    justify-content: center;
+  }
+  .page {
+    padding: 24px 16px 72px;
+  }
+  .check-row {
+    grid-template-columns: 20px 1fr;
+  }
+  .check-row .value {
+    grid-column: 2;
+  }
+  .pick {
+    flex-wrap: wrap;
+  }
+  .pick .pick-meta {
+    white-space: normal;
+  }
+  .beats li {
+    grid-template-columns: 26px 1fr;
+  }
+  .beats li b {
+    grid-column: 2;
+  }
+  .beats li span {
+    grid-column: 2;
+  }
+}
+/* motion ------------------------------------------------------------------ */
+
+/* The parts of the shell that are still there after a screen change keep their identity across it,
+ * so the chrome stays put and only the screen under it moves. Naming them is what turns a
+ * cross-fade of the whole page into a transition of the part that actually changed. */
+.topbar {
+  view-transition-name: topbar;
+}
+.rail {
+  view-transition-name: rail;
+}
+.steps {
+  view-transition-name: steps;
+}
+#view {
+  view-transition-name: screen;
+}
+
+::view-transition-old(screen),
+::view-transition-new(screen) {
+  animation-duration: var(--slow);
+  animation-timing-function: var(--ease);
+}
+::view-transition-old(screen) {
+  animation-name: screen-out;
+}
+::view-transition-new(screen) {
+  animation-name: screen-in;
+}
+
+@keyframes screen-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Hover and focus are state changes, so they move too, but only in colour: a row that grows or
+ * lifts under the pointer is the kind of motion that reads as a toy. */
+.nav,
+.pick,
+.chip,
+.option,
+/* biome-ignore lint/style/noDescendingSpecificity: this rule only lists transition properties, which nothing above sets */
+button,
+input,
+select,
+textarea,
+.tab {
+  transition:
+    background-color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease),
+    color var(--fast) var(--ease),
+    box-shadow var(--fast) var(--ease);
+}
+
+/* One focus ring, on everything, and only for keyboard use. An outline that appears on a mouse
+ * click reads as a mistake, so nothing here removes :focus-visible to avoid that. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Dialogs animate in and out with the platform, not with a timer: @starting-style gives the enter
+ * frame, allow-discrete keeps the element around long enough to play the exit. */
+dialog.picker,
+dialog.drawer {
+  transition:
+    opacity var(--fast) var(--ease),
+    transform var(--slow) var(--ease),
+    overlay var(--slow) allow-discrete,
+    display var(--slow) allow-discrete;
+  opacity: 0;
+}
+dialog.picker {
+  transform: translateY(8px) scale(0.98);
+}
+dialog.drawer {
+  transform: translateX(16px);
+}
+dialog.picker[open],
+dialog.drawer[open] {
+  opacity: 1;
+  transform: none;
+}
+@starting-style {
+  dialog.picker[open] {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  dialog.drawer[open] {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+dialog::backdrop {
+  transition:
+    opacity var(--slow) var(--ease),
+    overlay var(--slow) allow-discrete,
+    display var(--slow) allow-discrete;
+  opacity: 0;
+}
+dialog[open]::backdrop {
+  opacity: 1;
+}
+@starting-style {
+  dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    /* biome-ignore lint/complexity/noImportantStyles: a reduced-motion preference overrides every rule that animates */
+    animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: as above */
+    transition: none !important;
+  }
+}
+
+/* Schema-built request forms. */
+.required {
+  color: var(--bad);
+}
+.warn-text {
+  color: var(--warn);
+}
+.field-hint {
+  font-size: 11px;
+  margin: 4px 0 0;
+}
+.json-field {
+  min-height: 64px;
+}

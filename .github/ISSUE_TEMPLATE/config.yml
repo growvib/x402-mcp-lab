@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security issue privately
+    url: https://github.com/growvib/x402-mcp-lab/security/advisories/new
+    about: Never report security issues in a public issue.
+  - name: The x402 specification
+    url: https://github.com/coinbase/x402
+    about: Questions about the protocol itself belong upstream.

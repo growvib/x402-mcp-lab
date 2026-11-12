@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# Written by test/e2e/screenshots.ts when no output directory is given.
+screenshots/

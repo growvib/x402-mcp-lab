@@ -1,0 +1,54 @@
+{
+  "id": "fixture",
+  "name": "Demo server",
+  "origin": "http://127.0.0.1:4999",
+  "environment": "fixture",
+  "resource": "/resource",
+  "method": "POST",
+  "mcp": "/mcp",
+  "wellKnown": "/.well-known/x402",
+  "knownPayTo": {
+    "eip155:8453": "0x2222222222222222222222222222222222222222",
+    "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp": "HiFZ2Q7BgmYDC6YqpigYQa5GAa2Sa2VZeozF6hYZxPCv"
+  },
+  "sampleBody": {
+    "item": "sample-report",
+    "variant": "standard",
+    "quantity": 1
+  },
+  "catalog": {
+    "list": "/catalog",
+    "service": "/catalog/{id}",
+    "idField": "id",
+    "titleField": "title",
+    "optionsField": "options",
+    "fields": {
+      "service": "item",
+      "option": "variant",
+      "quantity": "quantity"
+    },
+    "searchParam": "search",
+    "facets": [
+      {
+        "param": "category",
+        "label": "Category"
+      }
+    ],
+    "express": {
+      "path": "metadata.express_presets",
+      "matchField": "param_key"
+    }
+  },
+  "notes": "The bundled demo server in fixtures/mock-x402.ts. Nothing here touches a chain or a wallet, so it is the safe place to learn the handshake. Start it with `node fixtures/mock-x402.ts`, and break it on purpose with ?flaws=<name> to see a check go red.",
+  "walletAuth": {
+    "challenge": "/v1/agent/auth/challenge",
+    "token": "/v1/agent/auth/token",
+    "tokenField": "agent_token"
+  },
+  "orders": {
+    "list": "/v1/agent/orders",
+    "get": "/v1/agent/orders/{id}",
+    "balanceField": "balance_usd",
+    "idField": "order_id"
+  }
+}

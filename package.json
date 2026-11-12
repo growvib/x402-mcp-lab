@@ -1,0 +1,49 @@
+{
+  "name": "x402-lab",
+  "version": "0.1.0",
+  "description": "A workbench for x402 resources and the MCP servers that speak it: choose, read what you sign, pay from a browser wallet, verify conformance.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/growvib/x402-mcp-lab.git"
+  },
+  "homepage": "https://github.com/growvib/x402-mcp-lab#readme",
+  "bugs": "https://github.com/growvib/x402-mcp-lab/issues",
+  "keywords": [
+    "x402",
+    "mcp",
+    "usdc",
+    "eip-3009",
+    "solana",
+    "payments",
+    "conformance"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "bin": {
+    "x402-lab": "./bin/x402-lab.ts"
+  },
+  "scripts": {
+    "build": "node scripts/build.ts",
+    "start": "node scripts/build.ts && node server.ts",
+    "dev": "node scripts/build.ts --watch --serve",
+    "mock": "node fixtures/mock-x402.ts",
+    "check": "node bin/x402-lab.ts check",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "node --test \"test/unit/**/*.test.ts\"",
+    "test:e2e": "node scripts/build.ts && node test/e2e/all.ts",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.7",
+    "@types/node": "22.20.5",
+    "esbuild": "0.28.2",
+    "playwright": "1.65.0",
+    "typescript": "7.0.2"
+  }
+}

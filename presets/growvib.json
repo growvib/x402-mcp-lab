@@ -1,0 +1,72 @@
+{
+  "id": "growvib",
+  "name": "GrowVib",
+  "origin": "https://api.growvib.com",
+  "environment": "mainnet",
+  "resource": "/v1/agent/orders",
+  "method": "POST",
+  "mcp": "/mcp-public",
+  "wellKnown": "/.well-known/x402",
+  "facilitator": "https://facilitator.payai.network/discovery/resources",
+  "knownPayTo": {
+    "eip155:8453": "0x2169FcD1a1D527Bf6a9031D898fAbDa01Bfd9D41",
+    "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp": "HiFZ2Q7BgmYDC6YqpigYQa5GAa2Sa2VZeozF6hYZxPCv"
+  },
+  "sampleBody": {
+    "service_id": "",
+    "quantity": 100,
+    "link": ""
+  },
+  "catalog": {
+    "list": "/v1/services?locale=en",
+    "service": "/v1/services/{id}?locale=en",
+    "idField": "id",
+    "titleField": "name",
+    "optionsField": "options",
+    "fields": {
+      "service": "service_id",
+      "option": "service_option_id",
+      "quantity": "quantity"
+    },
+    "searchParam": "search",
+    "facets": [
+      {
+        "param": "platform_key",
+        "label": "Platform",
+        "valuesPath": "/v1/services/platforms",
+        "valueField": "key",
+        "labelField": "name",
+        "countField": "service_count"
+      },
+      {
+        "param": "metric",
+        "label": "What you are buying",
+        "valuesPath": "/v1/services/metrics?platform_key={platform_key}",
+        "valueField": "key",
+        "labelField": "label",
+        "countField": "service_count",
+        "dependsOn": "platform_key"
+      }
+    ],
+    "priceUnit": "per 1K",
+    "express": {
+      "path": "metadata.express_presets",
+      "matchField": "param_key",
+      "keyField": "key",
+      "labelField": "label",
+      "subtitleField": "subtitle"
+    }
+  },
+  "walletAuth": {
+    "challenge": "/v1/agent/auth/challenge",
+    "token": "/v1/agent/auth/token",
+    "tokenField": "agent_token"
+  },
+  "orders": {
+    "list": "/v1/agent/orders",
+    "get": "/v1/agent/orders/{id}",
+    "balanceField": "balance_usd",
+    "idField": "order_id"
+  },
+  "notes": "Anything paid above the order's price stays as spendable balance on the wallet's account, so the remainder after a payment is not lost. A 200 means money moved and no order was created: the funds are safe as balance, do not pay again."
+}
